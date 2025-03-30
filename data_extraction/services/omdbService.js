@@ -11,6 +11,12 @@ export async function getMovieDetailsOmdb(imdbId) {
   try {
     const response = await axios.get(omdbApiBaseUrl, { params });
     const data = response.data;
+
+    if (data.Response === 'False' && data.Error === 'Request limit reached!') {
+      console.error(`OMDb API rate limit reached. Stopping the program.`);
+      process.exit(1); // Exit the process with a non-zero code to indicate an error
+    }
+    
     if (data.Response === 'True') {
       return data;
     } else {
