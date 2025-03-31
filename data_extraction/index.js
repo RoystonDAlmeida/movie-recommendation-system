@@ -7,6 +7,7 @@ import { insertMovie, isMovieProcessed, markMovieAsProcessed } from './services/
 import { getMovieEmbedding } from './config/embedder.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { SkippedMoviesManager } from './SkippedMoviesManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +20,10 @@ async function main() {
   // Initialize the embedding pipeline
   await initializeEmbedder();
 
+  // Initialize the skipped movies manager
+  const skippedMoviesManager = new SkippedMoviesManager();
+  await skippedMoviesManager.loadSkippedMovies(); // Ensure skipped movies are loaded
+
   const imdbDatasetFilepath = 'title.basics.tsv.gz';
   try {
     const movieImdbIds = await parseImdbDataset(imdbDatasetFilepath);
@@ -30,10 +35,14 @@ async function main() {
         continue;
       }
 
+      // Check if the movie has been skipped
+      if (skippedMoviesManager.isMovieSkipped(imdbId)) {
+        console.log(`Movie already skipped: ${imdbId}`);
+        continue;
+      }
+
       try {
         const movieDetails = await getMovieDetailsOmdb(imdbId);
-
-        if (!movieDetails) continue;
 
         const id = movieDetails.imdbID;
         const title = movieDetails.Title;
@@ -47,6 +56,7 @@ async function main() {
         // Skip the current movie if any of the following conditions are met:
         if (plot === 'N/A' || rating === null || languages === null || poster === null || year === null || year !== 2024) {
           console.log(`Skipping Movie: ${title}`);
+          await skippedMoviesManager.addSkippedMovie(imdbId); // Add the skipped movie to 'skipped_movies.txt'
           continue;
         }
 
